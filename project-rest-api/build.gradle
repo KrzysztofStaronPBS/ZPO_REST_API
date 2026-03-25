@@ -45,7 +45,21 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	
 	implementation group: 'org.springdoc', name: 'springdoc-openapi-starter-webmvc-ui', version: '2.8.5'
-	
+
+	// hateoas
+	implementation 'org.springframework.boot:spring-boot-starter-hateoas'
+
+	// mapstruct
+	implementation 'org.mapstruct:mapstruct:1.6.3'
+	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+
+	// wsparcie dla współpracy Lombok + MapStruct
+	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+	// JWT
+	implementation group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.13.0'
+	runtimeOnly group: 'io.jsonwebtoken', name: 'jjwt-impl', version: '0.13.0'
+	runtimeOnly group: 'io.jsonwebtoken', name: 'jjwt-jackson', version: '0.13.0'
 }
 
 tasks.named('test') {

@@ -1,88 +1,120 @@
 package com.project.controller;
 
-import java.net.URI;
-
+import com.project.dto.ZadanieDTO;
+import com.project.mapper.ZadanieMapper;
+import com.project.model.Zadanie;
+import com.project.service.ZadanieService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.bind.annotation.*;
 
-import com.project.model.Zadanie;
-import com.project.service.ZadanieService;
+import java.util.List;
 
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 @RestController
 @RequestMapping("/api")
 @Tag(name = "Zadanie")
 public class ZadanieRestController {
-	
-	private ZadanieService zadanieService;
-	
-	@Autowired
-	public ZadanieRestController(ZadanieService zadanieService) {
-		this.zadanieService = zadanieService;
-	}
-	
-	@GetMapping("/zadania/{zadanieId}")
-	public ResponseEntity<Zadanie> getZadanie(@PathVariable("zadanieId") Integer zadanieId) {
-	    return ResponseEntity.of(zadanieService.getZadanie(zadanieId));
-	}
+
+    private final ZadanieService zadanieService;
+    private final ZadanieMapper zadanieMapper;
+
+    @Autowired
+    public ZadanieRestController(ZadanieService zadanieService, ZadanieMapper zadanieMapper) {
+        this.zadanieService = zadanieService;
+        this.zadanieMapper = zadanieMapper;
+    }
+
+    @GetMapping("/zadania/{zadanieId}")
+    public ResponseEntity<EntityModel<ZadanieDTO>> getZadanie(@PathVariable Integer zadanieId) {
+        return zadanieService.getZadanie(zadanieId)
+                .map(zadanieMapper::zadanieToZadanieDTO)
+                .map(this::addHateoasLinks)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 
     @PostMapping(path = "/zadania")
-    public ResponseEntity<Void> createZadanie(@Valid @RequestBody Zadanie zadanie) {
-        Zadanie createdZadanie = zadanieService.setZadanie(zadanie);
+    public ResponseEntity<EntityModel<ZadanieDTO>> createZadanie(@Valid @RequestBody ZadanieDTO zadanieDto) {
+        Zadanie zadanie = zadanieMapper.zadanieDTOToZadanie(zadanieDto);
+        Zadanie created = zadanieService.setZadanie(zadanie);
 
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()
-                .path("/{zadanieId}")
-                .buildAndExpand(createdZadanie.getZadanieId())
-                .toUri();
+        ZadanieDTO responseDto = zadanieMapper.zadanieToZadanieDTO(created);
+        EntityModel<ZadanieDTO> entityModel = addHateoasLinks(responseDto);
 
-        return ResponseEntity.created(location).build();
+        return ResponseEntity
+                .created(entityModel.getRequiredLink("self").toUri())
+                .body(entityModel);
     }
-    
+
     @PutMapping("/zadania/{zadanieId}")
-    public ResponseEntity<Void> updateZadanie(@Valid @RequestBody Zadanie zadanie,
-                                              @PathVariable("zadanieId") Integer zadanieId) {	
+    public ResponseEntity<EntityModel<ZadanieDTO>> updateZadanie(@Valid @RequestBody ZadanieDTO zadanieDto,
+                                                                 @PathVariable Integer zadanieId) {
         return zadanieService.getZadanie(zadanieId)
-                .map(p -> {
-                    zadanieService.setZadanie(zadanie);
-                    return new ResponseEntity<Void>(HttpStatus.OK);
+                .map(existing -> {
+                    Zadanie zadanie = zadanieMapper.zadanieDTOToZadanie(zadanieDto);
+                    zadanie.setZadanieId(zadanieId);
+                    Zadanie updated = zadanieService.setZadanie(zadanie);
+                    return ResponseEntity.ok(addHateoasLinks(zadanieMapper.zadanieToZadanieDTO(updated)));
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-    
+
     @DeleteMapping("/zadania/{zadanieId}")
-    public ResponseEntity<Void> deleteZadanie(@PathVariable("zadanieId") Integer zadanieId) {
+    public ResponseEntity<Void> deleteZadanie(@PathVariable Integer zadanieId) {
         return zadanieService.getZadanie(zadanieId)
-                .map(p -> {
+                .map(z -> {
                     zadanieService.deleteZadanie(zadanieId);
-                    return new ResponseEntity<Void>(HttpStatus.OK);
+                    return new ResponseEntity<Void>(HttpStatus.NO_CONTENT);
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-    
+
     @GetMapping(value = "/zadania")
-    public Page<Zadanie> getZadania(@ParameterObject Pageable pageable) {
-        return zadanieService.getZadania(pageable);
+    public ResponseEntity<CollectionModel<EntityModel<ZadanieDTO>>> getZadania(@ParameterObject Pageable pageable) {
+        Page<Zadanie> page = zadanieService.getZadania(pageable);
+        return ResponseEntity.ok(convertToCollectionModel(page, pageable));
     }
-    
+
     @GetMapping(value = "/zadania", params = "nazwa")
-    Page<Zadanie> getZadaniaByNazwa(@RequestParam(name = "nazwa") String nazwa, Pageable pageable) {
-        return zadanieService.searchByNazwa(nazwa, pageable);
+    public ResponseEntity<CollectionModel<EntityModel<ZadanieDTO>>> getZadaniaByNazwa(
+            @RequestParam(name = "nazwa") String nazwa, Pageable pageable) {
+
+        Page<Zadanie> page = zadanieService.searchByNazwa(nazwa, pageable);
+        return ResponseEntity.ok(convertToCollectionModel(page, pageable));
+    }
+
+    private CollectionModel<EntityModel<ZadanieDTO>> convertToCollectionModel(Page<Zadanie> page, Pageable pageable) {
+        List<EntityModel<ZadanieDTO>> dtos = page.getContent().stream()
+                .map(zadanieMapper::zadanieToZadanieDTO)
+                .map(this::addHateoasLinks)
+                .toList();
+
+        return CollectionModel.of(dtos,
+                linkTo(methodOn(ZadanieRestController.class).getZadania(pageable)).withSelfRel());
+    }
+
+    private EntityModel<ZadanieDTO> addHateoasLinks(ZadanieDTO dto) {
+        EntityModel<ZadanieDTO> model = EntityModel.of(dto);
+
+        model.add(linkTo(methodOn(ZadanieRestController.class).getZadanie(dto.getZadanieId())).withSelfRel());
+
+        if (dto.getProjektId() != null) {
+            model.add(linkTo(methodOn(ProjektRestController.class).getProjekt(dto.getProjektId())).withRel("projekt"));
+        }
+
+        model.add(linkTo(methodOn(ZadanieRestController.class).deleteZadanie(dto.getZadanieId())).withRel("usun_zadanie"));
+
+        return model;
     }
 }

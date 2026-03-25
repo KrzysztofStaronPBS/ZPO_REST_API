@@ -22,15 +22,16 @@ import jakarta.transaction.Transactional;
 @Service
 public class ProjektServiceImpl implements ProjektService {
 
-	private ProjektRepository projektRepository;
-	private ZadanieRepository zadanieRepository;
-	@Autowired
-	private StudentRepository studentRepository;
+	private final ProjektRepository projektRepository;
+	private final ZadanieRepository zadanieRepository;
+	private final StudentRepository studentRepository;
 
-	@Autowired // w tej wersji konstruktora Spring wstrzyknie dwa repozytoria
-	public ProjektServiceImpl(ProjektRepository projektRepository, ZadanieRepository zadanieRepo) {
+	@Autowired
+	public ProjektServiceImpl(ProjektRepository projektRepository,
+							  ZadanieRepository zadanieRepo, StudentRepository studentRepo) {
 		this.projektRepository = projektRepository;
 		this.zadanieRepository = zadanieRepo;
+		this.studentRepository = studentRepo;
 }
 
 	@Override
@@ -49,9 +50,7 @@ public class ProjektServiceImpl implements ProjektService {
 	@Override
 	@Transactional
 	public void deleteProjekt(Integer projektId) {
-		for (Zadanie zadanie : zadanieRepository.findZadaniaProjektu(projektId)) {
-			zadanieRepository.delete(zadanie);
-		}
+        zadanieRepository.deleteAll(zadanieRepository.findZadaniaProjektu(projektId));
 		projektRepository.deleteById(projektId);
 	}
 

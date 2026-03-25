@@ -15,7 +15,7 @@ import com.project.repository.ZadanieRepository;
 @Service
 public class ZadanieServiceImpl implements ZadanieService {
 	
-	private ZadanieRepository zadanieRepository;
+	private final ZadanieRepository zadanieRepository;
 	
 	@Autowired
 	public ZadanieServiceImpl (ZadanieRepository zadanieRepo) {

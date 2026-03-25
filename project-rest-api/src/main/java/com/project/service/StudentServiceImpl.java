@@ -1,19 +1,16 @@
 package com.project.service;
 
-import java.util.List;
-import java.util.Optional;
-
+import com.project.model.Projekt;
+import com.project.model.Student;
+import com.project.repository.StudentRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import com.project.model.Projekt;
-import com.project.model.Student;
-import com.project.repository.ProjektRepository;
-import com.project.repository.StudentRepository;
-
-import jakarta.transaction.Transactional;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class StudentServiceImpl implements StudentService {
@@ -22,7 +19,7 @@ public class StudentServiceImpl implements StudentService {
 	private StudentRepository studentRepository;
 	
 	@Autowired
-	public StudentServiceImpl(StudentRepository studentRepo, ProjektRepository projektRepo) {
+	public StudentServiceImpl(StudentRepository studentRepo) {
 		this.studentRepository = studentRepo;
 	}
 	
@@ -75,5 +72,10 @@ public class StudentServiceImpl implements StudentService {
 	@Override
 	public List<Projekt> findProjektyStudenta(Integer studentId) {
 		return studentRepository.findProjektyStudenta(studentId);
+	}
+
+	@Override
+	public Optional<Student> findByEmail(String email) {
+		return studentRepository.findByEmail(email);
 	}
 }

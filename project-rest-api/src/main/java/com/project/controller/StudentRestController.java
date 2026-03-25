@@ -1,97 +1,125 @@
 package com.project.controller;
 
-import java.net.URI;
-
+import com.project.dto.StudentDTO;
+import com.project.mapper.StudentMapper;
+import com.project.model.Student;
+import com.project.service.StudentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.bind.annotation.*;
 
-import com.project.model.Student;
-import com.project.service.StudentService;
-
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
 @Tag(name = "Student")
 public class StudentRestController {
-	
-	private StudentService studentService;
-	
-	@Autowired
-	public StudentRestController(StudentService studentService) {
-		this.studentService = studentService;
-	}
-	
-	@GetMapping("/studenci/{studentId}")
-	public ResponseEntity<Student> getStudent(@PathVariable("studentId") Integer studentId) {
-		return ResponseEntity.of(studentService.getStudent(studentId));
-	}
-	
+
+    private final StudentService studentService;
+    private final StudentMapper studentMapper;
+
+    @Autowired
+    public StudentRestController(StudentService studentService, StudentMapper studentMapper) {
+        this.studentService = studentService;
+        this.studentMapper = studentMapper;
+    }
+
+    @GetMapping("/studenci/{studentId}")
+    public ResponseEntity<EntityModel<StudentDTO>> getStudent(@PathVariable Integer studentId) {
+        return studentService.getStudent(studentId)
+                .map(studentMapper::studentToStudentDTO)
+                .map(this::addHateoasLinks)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping(path = "/studenci")
-    public ResponseEntity<Void> createStudent(@Valid @RequestBody Student student) {
+    public ResponseEntity<EntityModel<StudentDTO>> createStudent(@Valid @RequestBody StudentDTO studentDto) {
+        Student student = studentMapper.studentDTOToStudent(studentDto);
         Student createdStudent = studentService.setStudent(student);
 
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()
-                .path("/{studentId}")
-                .buildAndExpand(createdStudent.getStudentId())
-                .toUri();
+        StudentDTO responseDto = studentMapper.studentToStudentDTO(createdStudent);
+        EntityModel<StudentDTO> entityModel = addHateoasLinks(responseDto);
 
-        return ResponseEntity.created(location).build();
+        return ResponseEntity
+                .created(entityModel.getRequiredLink("self").toUri())
+                .body(entityModel);
     }
-    
+
     @PutMapping("/studenci/{studentId}")
-    public ResponseEntity<Void> updateStudent(@Valid @RequestBody Student student,
-                                              @PathVariable("studentId") Integer studentId) {
+    public ResponseEntity<EntityModel<StudentDTO>> updateStudent(@Valid @RequestBody StudentDTO studentDto,
+                                                                 @PathVariable Integer studentId) {
         return studentService.getStudent(studentId)
-                .map(p -> {
-                    studentService.setStudent(student);
-                    return new ResponseEntity<Void>(HttpStatus.OK);
+                .map(existing -> {
+                    Student student = studentMapper.studentDTOToStudent(studentDto);
+                    student.setStudentId(studentId); // Zapewnienie stałości ID
+                    Student updated = studentService.setStudent(student);
+                    return ResponseEntity.ok(addHateoasLinks(studentMapper.studentToStudentDTO(updated)));
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-    
+
     @DeleteMapping("/studenci/{studentId}")
-    public ResponseEntity<Void> deleteStudent(@PathVariable("studentId") Integer studentId) {
+    public ResponseEntity<Void> deleteStudent(@PathVariable Integer studentId) {
         return studentService.getStudent(studentId)
                 .map(p -> {
                     studentService.deleteStudent(studentId);
-                    return new ResponseEntity<Void>(HttpStatus.OK);
+                    return new ResponseEntity<Void>(HttpStatus.NO_CONTENT); // 204 No Content jest lepsze dla Delete
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-    
+
     @GetMapping(value = "/studenci")
-    public Page<Student> getStudenci(Pageable pageable) {
-        return studentService.getStudenci(pageable);
+    public ResponseEntity<CollectionModel<EntityModel<StudentDTO>>> getStudenci(Pageable pageable) {
+        Page<Student> page = studentService.getStudenci(pageable);
+        return ResponseEntity.ok(convertToCollectionModel(page, pageable));
     }
-    
+
     @GetMapping("/studenci/search")
-    public Page<Student> searchStudents(
+    public ResponseEntity<CollectionModel<EntityModel<StudentDTO>>> searchStudents(
             @RequestParam(required = false) String nazwisko,
             @RequestParam(required = false) String nrIndeksu,
             Pageable pageable) {
 
+        Page<Student> page;
         if (nazwisko != null && !nazwisko.isBlank()) {
-            return studentService.findByNazwiskoStartsWithIgnoreCase(nazwisko, pageable);
+            page = studentService.findByNazwiskoStartsWithIgnoreCase(nazwisko, pageable);
         } else if (nrIndeksu != null && !nrIndeksu.isBlank()) {
-            return studentService.findByNrIndeksuStartsWith(nrIndeksu, pageable);
+            page = studentService.findByNrIndeksuStartsWith(nrIndeksu, pageable);
         } else {
-            return studentService.getStudenci(pageable);
+            page = studentService.getStudenci(pageable);
         }
+
+        return ResponseEntity.ok(convertToCollectionModel(page, pageable));
+    }
+
+    private CollectionModel<EntityModel<StudentDTO>> convertToCollectionModel(Page<Student> page, Pageable pageable) {
+        List<EntityModel<StudentDTO>> dtos = page.getContent().stream()
+                .map(studentMapper::studentToStudentDTO)
+                .map(this::addHateoasLinks)
+                .toList();
+
+        return CollectionModel.of(dtos,
+                WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(StudentRestController.class)
+                        .getStudenci(pageable)).withSelfRel());
+    }
+
+    private EntityModel<StudentDTO> addHateoasLinks(StudentDTO dto) {
+        return EntityModel.of(dto,
+                WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(StudentRestController.class)
+                        .getStudent(dto.getStudentId())).withSelfRel(),
+                WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(StudentRestController.class)
+                        .getStudenci(Pageable.unpaged())).withRel("lista_studentow"),
+                WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(StudentRestController.class)
+                        .deleteStudent(dto.getStudentId())).withRel("usun_studenta")
+        );
     }
 }

@@ -1,25 +1,33 @@
 package com.project.model;
 
+import java.util.Collection;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.Table;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
+@Setter
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity //Indeksujemy kolumny, które są najczęściej wykorzystywane do wyszukiwania studentów
 @Table(name = "student",
 indexes = { 
-		@Index(name = "idx_nazwisko", columnList = "nazwisko", unique = false),
+		@Index(name = "idx_nazwisko", columnList = "nazwisko"),
+		@Index(name = "idx_email", columnList = "email", unique = true),
 		@Index(name = "idx_nr_indeksu", columnList = "nr_indeksu", unique = true) })
-public class Student {
+public class Student implements UserDetails {
 	@Id
 	@GeneratedValue
 	@Column(name = "student_id")
@@ -39,7 +47,8 @@ public class Student {
 	@Size(min = 3, max = 20, message = "Numer indeksu musi zawierać od {min} do {max} znaków!")
 	@Column(name = "nr_indeksu", nullable = false, unique = true, length = 20)
 	private String nrIndeksu;
-	
+
+	@Email(message = "Niepoprawny format adresu e-mail")
 	@NotBlank(message = "Pole email nie może być puste!")
 	@Size(min = 3, max = 50, message = "Email musi zawierać od {min} do {max} znaków!")
 	@Column(unique = true, nullable = false, length = 50)
@@ -51,89 +60,27 @@ public class Student {
 	@JsonIgnoreProperties({"studenci"})
 	@ManyToMany(mappedBy = "studenci")
 	private Set<Projekt> projekty;
-	
 
-	public Integer getStudentId() {
-		return studentId;
+	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+	@Size(min=8, max=64, message="Hasło musi składać się z przynajmniej {min} i nie przekraczać {max} znaków")
+	private String password;
+
+	@ManyToMany(fetch = FetchType.EAGER)
+	@JoinTable(name = "student_role",
+			joinColumns = {@JoinColumn(name="student_id")},
+			inverseJoinColumns = {@JoinColumn(name = "role_id")})
+	private Set<Role> roles;
+
+	@Override
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		return this.roles
+				.stream()
+				.map(r -> new SimpleGrantedAuthority(r.getName()))
+				.collect(Collectors.toList());
 	}
 
-	public void setStudentId(Integer studentId) {
-		this.studentId = studentId;
-	}
-
-	public String getImie() {
-		return imie;
-	}
-
-	public void setImie(String imie) {
-		this.imie = imie;
-	}
-
-	public String getNazwisko() {
-		return nazwisko;
-	}
-
-	public void setNazwisko(String nazwisko) {
-		this.nazwisko = nazwisko;
-	}
-
-	public String getNrIndeksu() {
-		return nrIndeksu;
-	}
-
-	public void setNrIndeksu(String nrIndeksu) {
-		this.nrIndeksu = nrIndeksu;
-	}
-
-	public String getEmail() {
-		return email;
-	}
-
-	public void setEmail(String email) {
-		this.email = email;
-	}
-
-	public Boolean getStacjonarny() {
-		return stacjonarny;
-	}
-
-	public void setStacjonarny(Boolean stacjonarny) {
-		this.stacjonarny = stacjonarny;
-	}
-
-	public Set<Projekt> getProjekty() {
-		return projekty;
-	}
-
-	public void setProjekty(Set<Projekt> projekty) {
-		this.projekty = projekty;
-	}
-
-	public Student() {}
-	
-
-
-	public Student(String imie, String nazwisko, String nrIndeksu, Boolean stacjonarny) {
-		this.imie = imie;
-		this.nazwisko = nazwisko;
-		this.nrIndeksu = nrIndeksu;
-		this.stacjonarny = stacjonarny;
-	}
-	
-	public Student(String imie, String nazwisko, String nrIndeksu, String email, Boolean stacjonarny) {
-		this.imie = imie;
-		this.nazwisko = nazwisko;
-		this.nrIndeksu = nrIndeksu;
-		this.email = email;
-		this.stacjonarny = stacjonarny;
-	}
-	
-	public Student(Integer studentId, String imie, String nazwisko, String nrIndeksu, String email, Boolean stacjonarny) {
-		this.studentId = studentId;
-		this.imie = imie;
-		this.nazwisko = nazwisko;
-		this.nrIndeksu = nrIndeksu;
-		this.email = email;
-		this.stacjonarny = stacjonarny;
+	@Override
+	public String getUsername() {
+		return this.email; //zakładamy, że e-mail będzie wykorzystywany przy logowaniu
 	}
 }

@@ -15,8 +15,10 @@ public interface StudentService {
 	void deleteStudent(Integer studentId);
 	Page<Student> getStudenci(Pageable pageable);
 	
-	public Optional<Student> findByNrIndeksu(String nrIndeksu);
-	public Page<Student> findByNrIndeksuStartsWith(String prefix, Pageable pageable);
-	public Page<Student> findByNazwiskoStartsWithIgnoreCase(String nazwisko, Pageable pageable);
-	public List<Projekt> findProjektyStudenta(Integer studentId);
+	Optional<Student> findByNrIndeksu(String nrIndeksu);
+	Page<Student> findByNrIndeksuStartsWith(String prefix, Pageable pageable);
+	Page<Student> findByNazwiskoStartsWithIgnoreCase(String nazwisko, Pageable pageable);
+	List<Projekt> findProjektyStudenta(Integer studentId);
+
+	Optional<Student> findByEmail(String email);
 }
