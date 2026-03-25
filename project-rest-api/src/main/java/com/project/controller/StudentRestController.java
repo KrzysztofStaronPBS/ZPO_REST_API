@@ -4,6 +4,7 @@ import com.project.dto.StudentDTO;
 import com.project.mapper.StudentMapper;
 import com.project.model.Student;
 import com.project.service.StudentService;
+import com.project.validation.ValidationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,11 +26,13 @@ public class StudentRestController {
 
     private final StudentService studentService;
     private final StudentMapper studentMapper;
+    private final ValidationService<Student> validator;
 
     @Autowired
-    public StudentRestController(StudentService studentService, StudentMapper studentMapper) {
+    public StudentRestController(StudentService studentService, StudentMapper studentMapper, ValidationService<Student> validator) {
         this.studentService = studentService;
         this.studentMapper = studentMapper;
+        this.validator = validator;
     }
 
     @GetMapping("/studenci/{studentId}")
@@ -44,6 +47,7 @@ public class StudentRestController {
     @PostMapping(path = "/studenci")
     public ResponseEntity<EntityModel<StudentDTO>> createStudent(@Valid @RequestBody StudentDTO studentDto) {
         Student student = studentMapper.studentDTOToStudent(studentDto);
+        validator.validate(student);
         Student createdStudent = studentService.setStudent(student);
 
         StudentDTO responseDto = studentMapper.studentToStudentDTO(createdStudent);
@@ -60,7 +64,8 @@ public class StudentRestController {
         return studentService.getStudent(studentId)
                 .map(existing -> {
                     Student student = studentMapper.studentDTOToStudent(studentDto);
-                    student.setStudentId(studentId); // Zapewnienie stałości ID
+                    student.setStudentId(studentId);
+                    validator.validate(student);
                     Student updated = studentService.setStudent(student);
                     return ResponseEntity.ok(addHateoasLinks(studentMapper.studentToStudentDTO(updated)));
                 })
@@ -72,7 +77,7 @@ public class StudentRestController {
         return studentService.getStudent(studentId)
                 .map(p -> {
                     studentService.deleteStudent(studentId);
-                    return new ResponseEntity<Void>(HttpStatus.NO_CONTENT); // 204 No Content jest lepsze dla Delete
+                    return new ResponseEntity<Void>(HttpStatus.NO_CONTENT);
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

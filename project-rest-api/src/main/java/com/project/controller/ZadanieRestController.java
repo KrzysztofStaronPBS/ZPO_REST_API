@@ -4,6 +4,7 @@ import com.project.dto.ZadanieDTO;
 import com.project.mapper.ZadanieMapper;
 import com.project.model.Zadanie;
 import com.project.service.ZadanieService;
+import com.project.validation.ValidationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
@@ -28,11 +29,13 @@ public class ZadanieRestController {
 
     private final ZadanieService zadanieService;
     private final ZadanieMapper zadanieMapper;
+    private final ValidationService<Zadanie> validator;
 
     @Autowired
-    public ZadanieRestController(ZadanieService zadanieService, ZadanieMapper zadanieMapper) {
+    public ZadanieRestController(ZadanieService zadanieService, ZadanieMapper zadanieMapper, ValidationService<Zadanie> validator) {
         this.zadanieService = zadanieService;
         this.zadanieMapper = zadanieMapper;
+        this.validator = validator;
     }
 
     @GetMapping("/zadania/{zadanieId}")
@@ -47,6 +50,7 @@ public class ZadanieRestController {
     @PostMapping(path = "/zadania")
     public ResponseEntity<EntityModel<ZadanieDTO>> createZadanie(@Valid @RequestBody ZadanieDTO zadanieDto) {
         Zadanie zadanie = zadanieMapper.zadanieDTOToZadanie(zadanieDto);
+        validator.validate(zadanie);
         Zadanie created = zadanieService.setZadanie(zadanie);
 
         ZadanieDTO responseDto = zadanieMapper.zadanieToZadanieDTO(created);
@@ -64,6 +68,7 @@ public class ZadanieRestController {
                 .map(existing -> {
                     Zadanie zadanie = zadanieMapper.zadanieDTOToZadanie(zadanieDto);
                     zadanie.setZadanieId(zadanieId);
+                    validator.validate(zadanie);
                     Zadanie updated = zadanieService.setZadanie(zadanie);
                     return ResponseEntity.ok(addHateoasLinks(zadanieMapper.zadanieToZadanieDTO(updated)));
                 })
