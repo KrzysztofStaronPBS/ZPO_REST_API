@@ -59,8 +59,8 @@ public class ProjektRestController {
     }
 
     @PutMapping("/projekty/{projektId}")
-    public ResponseEntity<EntityModel<ProjektDTO>> updateProjekt(@Valid @RequestBody ProjektDTO projektDto,
-                                                                 @PathVariable Integer projektId) {
+    public ResponseEntity<EntityModel<ProjektDTO>> updateProjekt(
+            @Valid @RequestBody ProjektDTO projektDto, @PathVariable Integer projektId) {
         return projektService.getProjekt(projektId)
                 .map(p -> {
                     Projekt projekt = projektMapper.projektDTOToProjekt(projektDto);

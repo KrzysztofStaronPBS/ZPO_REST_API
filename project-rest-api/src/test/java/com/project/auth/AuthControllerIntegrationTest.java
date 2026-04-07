@@ -93,6 +93,24 @@ public class AuthControllerIntegrationTest {
     }
 
     @Test
+    void login_shouldReturnUnauthorized_whenCredentialsAreInvalid() throws Exception {
+        // given
+        Credentials invalidCredentials = new Credentials("niepoprawny@pbs.edu.pl", "zle-haslo");
+
+        // symulacja zachowania mechanizmu AuthenticationManager rzucającego wyjątek przy błędnym loginu lub haśle
+        when(authService.authenticate(any(Credentials.class)))
+                .thenThrow(new org.springframework.security.authentication.BadCredentialsException("Błędne dane logowania"));
+
+        // when & then
+        mockMvc.perform(post("/api/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidCredentials)))
+                .andExpect(status().isUnauthorized());
+
+        verify(authService, times(1)).authenticate(any(Credentials.class));
+    }
+
+    @Test
     void refresh_shouldReturnNewTokens_whenRefreshTokenIsValid() throws Exception {
         // given
         Tokens inputTokens = Tokens.builder().refreshToken("old-refresh-token").build();
